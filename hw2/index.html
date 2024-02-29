@@ -1,7 +1,394 @@
-<html>
-	<head>
-	</head>
-	<body>
-		Homework 2 index.html here
-	</body>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    background-color: white;
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+  kbd {
+    color: #121212;
+  }
+</style>
+<title>CS 184 Mesh Edit</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+
+<script>
+  MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']]
+    }
+  };
+</script>
+<script id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js">
+</script>
+
+</head>
+
+
+<body>
+
+<!-- webpage link -->
+<h2>
+  <p>
+    <a href = "https://cal-cs184-student.github.io/hw-webpages-sp24-jsun28/">Webpage Link</a>
+  </p>
+</h2>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2024</h1>
+<h1 align="middle">Project 2: Mesh Edit</h1>
+<h2 align="middle">Arjun Damerla and Julia Sun</h2>
+
+<br><br>
+
+<div>
+
+<h2 align="middle">Overview</h2>
+<p>
+  This homework was made up of two parts. In the first part, we implemented Bezier curves and surfaces - smooth, continuous curves that can be easily tweaked and moved around by adjusting the respective control points - by implementing de Casteljau's algorithm. In the second part, we utilized the simple-yet-elegant “half-edge” data structure to further modify/improve the meshes of our 3-D structures, effectively smoothing out our models and giving them more texture/character where needed. <br><br>
+
+  Throughout this process, we used a whole bunch of pointers, pointers, and pointers (which will be talked about more below). At a high level, what we learned from this homework was how a  huge amount of effort and care is required to change/smoothen the outwards shape of our models. In other words, more triangles equals more half-edge pointers, and further subdivisions. All of these subdivisions (and original divisions) need to be accounted for somehow, and a data structure such as halfedges does a very good job in organizing all that you need to modify these meshes.
+  
+</p>
+<br>
+
+
+<h2 align="middle">Section I: Bezier Curves and Surfaces</h2>
+
+<h3 align="middle">Part 1: Bezier Curves with 1D de Casteljau Subdivision</h3>
+
+<p>
+  De Casteljau’s algorithm is a recursive method to calculate the Bezier Curve through a series of linear interpolations. This algorithm results in an efficient method for evaluating points along Bezier curves. For every level, De Casteljau’s algorithm performs linear interpolation on a line segment between two control points based on a given scalar parameter t. The output from each  linear interpolation is the new point, and this point will be linearly interpolated during the next level. This process continues recursively until a single point is found. The final point represents the point on the Bezier curve. <br><br>
+
+  For example, if we have n points, denoted as [p_1, p_2, …, p_n], then our first step in De Casteljau’s algorithm is, between points p_i and p{i+1} for each of 1 <= i <= n-1, we make a new point on the line segment between these two points, adjusted depending on the value t (which tells us how close we want this new point to be on p_i or p_{i+1}). Doing this for all pairs of successive points gives us n-1 new points as an output. <br><br>
+  Our next step in the whole algorithm is to perform the same process for these n-1 points, resulting in n-2 points. Then, we perform again on these points to get n-3 points. We perform this process again and again, until we’re finally left with one singular point. Keep in mind that we use the same value of t for each of these recursive steps. 
+  It may not seem like we did that much work, because now we’re just left with one lousy point instead of an actual curve. However, the magic happens when we perform this algorithm with varying values of t, specifically values of t between 0 and 1. This will actually draw out the full, smooth, continuous bezier curve as we vary t from beginning to end. The final point is a point on the bezier curve, so tracking the final point everytime we adjust t a little and perform the whole algorithm will eventually draw out the whole bezier curve for us. <br><br>
+  
+  To implement De Casteljau’s algorithm, in the evaluateStep function, we evaluate ONE step of De Casteljau’s algorithm by first iterating through the points until the second to last point. For each point p_i we reach in our iteration, we find the new point p_new that lies on the line segment between p_i and p_{i+1}. We turn p_new into a vector (starting at the origin and ending at p_new), and effectively do this for all the p_new’s we get (assuming we were given n points as input, we would have n-1 p_new’s). Finally, we return this list of new vectors, and we’re done! <br><br>
+  
+</p>
+
+<p>
+    Here we have a Bezier curve with 6 control points. 
+</p>
+<!-- Example of including a single figure -->
+<div align="middle">
+  <img src="part1_0.png" align="middle" width="50%">
+</div>
+<br>
+<p>
+  For every level of the evaluation from the original control points, new line segements are formed based on the previous level's control point. This continues until the final point is found and the Bezier curve can be formed. 
+</p>
+<!-- Example of including multiple figures -->
+<div align="middle">
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="part1_1.png" align="middle" width="500px"/>
+        <figcaption>Level 0</figcaption>
+      </td>
+      <td>
+        <img src="part1_2.png" align="middle" width="500px"/>
+        <figcaption>Level 1</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr align="center">
+      <td>
+        <img src="part1_3.png" align="middle" width="500px"/>
+        <figcaption>Level 2</figcaption>
+      </td>
+      <td>
+        <img src="part1_4.png" align="middle" width="500px"/>
+        <figcaption>Level 3</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr align="center">
+      <td>
+        <img src="part1_curve.png" align="middle" width="500px"/>
+        <figcaption>Level 4</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+<br>
+
+
+<p>
+  Here is a slightly different Bezier curve which was formed by moving the original control points around and modifying the parameter \(t\) via mouse scrolling.
+</p>
+<p>
+
+</p>  
+<br>
+<!-- Example of slightly different Bezier curve -->
+<div align="middle">
+  <img src="part1_diff.png" align="middle" width="50%">
+</div>
+<br>
+
+
+<h3 align="middle">Part 2: Bezier Surfaces with Separable 1D de Casteljau</h3>
+
+<p>
+  While Bezier Curves may look interesting (especially since you can vary the position of the control points in any way you wish), these are still just curves, not entire surfaces that can define some 3D body or structure. Fortunately, it turns out that De Casteljau’s algorithm can actually be extended to “Bezier surfaces”, effectively allowing us to - not just make any curve we can imagine - but also to construct any surface we imagine! This is done by essentially joining together an array of 1D bezier curves, and when nudged together, they define a surface. <br><br>
+  For instance, say we have an nxn grid of control points P_i,j. Each row of n control points, so for instance (P_{i,0}, P_{i,1}, … P_{i, n-1}) is one row, can each be used to define its own bezier curve, and let’s say each of these n curves are parameterized by the same value u. With each of these n curves, we can run the algorithm to get the final point P_i, so we have n of these final points. It turns out that we can actually run the algorithm again on these n points, say parameterized by some v. This algorithm will therefore finally recurse all the way to one singular point, P, and it turns out that this point P lies on our Bezier surface, and varying our parameters of u and v will allow P to span our entire surface. <br><br>
+  
+  To evaluate Bezier surfaces, in the evaluate function, we interpolated EACH row from the grid of original control points by first calling evaluate1D on the parameter u. Within evaluate1D, we call evaluateStep which performs linear interpolation until the final point is found for the row axis, and we do this for each row. So, at this point, if there were say n rows, then we now have n of these final points. Using the n points, we perform the De Casteljau algorithm one more time, this time with the parameter v, until the final point on the surface that corresponds to (u, v) is found. Varying u and v will give us many more of these final surface points, which will then result in us being able to use all these points to fully define our surface. <br><br>
+  
+</p>
+<p>
+    This is an image of bez/teapot.bez after the de Casteljau algorithm was extended to Bezier surfaces.
+</p>
+
+<div align="middle">
+  <img src="part 2.png" align="middle" width="50%">
+</div>
+<br>
+<br>
+
+
+<h2 align="middle">Section II: Triangle Meshes and Half-Edge Data Structure</h2>
+
+<h3 align="middle">Part 3: Area-Weighted Vertex Normals</h3>
+
+<p>
+  This part introduced us to the halfedge data structure, a data structure that’s useful for traversing through meshes and obtaining data from these meshes with relative ease. In the case of part 3, the halfedge data structure allows us to quickly find all of the faces that use the vertex we are looking at, through a series of twin()’s and next()’s (specifically doing half_edge->twin()->next() while going through all the faces using our vertex). As we go through every face, we want to find the normal vector associated with the two vectors that both make that face, and take a corresponding cross product, thus giving us two times the area of that face. After normalizing and dividing this cross product by two, we get the normal weight of that face. Now, since we have many of these normal weights, we sum them all up into one 3-dimensional vector (originally initialized to the zero vector), and once we have this loaded 3-D vector, we turn it into a unit vector (by using .unit()), thus giving us a normalized vector for this vertex which we can now return. This will effectively smoothen out our surfaces, as shown below.
+</p>
+<br>
+
+<p>
+  Below are images of dae/teapot.dae with and without vertex normals. The image on the right represents the teapot with vertex normals and it can be seen as it has a smoother surface. 
+</p>
+
+<div align="middle">
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="part3_og.png" align="middle" width="500px"/>
+        <figcaption>Original Teapot with Phong Shading</figcaption>
+      </td>
+      <td>
+        <img src="part3_normal.png" align="middle" width="500px"/>
+        <figcaption>Teapot with Vertex Normals</figcaption>
+      </td>
+    </tr>
+    <br>
+    <br>
+  </table>
+</div>
+<br>
+
+
+<br>
+
+
+<h3 align="middle">Part 4: Edge Flip</h3>
+<b>
+  In this part, we had to implement edge flips, which allow us to further complexify our mesh by, as the name suggests, “flipping” any edge we choose. The diagram below shows the result of flipping the edge (b,c) to (a,d). In our implementation, we labeled all the 10 half-edges (since there are 5 edges), and went to town with setting the neighbors of these 10 half-edges according to the edge flip. It’s worth noting that all these 10 half-edges originate from the original e0: through a combination of next()’s an twin()’s, we can traverse through all 10 half-edges, and define them accordingly so that we can set their neighbors. <br><br>
+
+In terms of implementation and debugging, our main goal was to write and draw EVERYTHING out before we began to even write one line of code for this part ; we knew that this part could’ve been a debugging nightmare if we started coding without knowing where everything is supposed to point to beforehand. So, once we coded everything up, we went line by line in our implementation, and with each line, we drew out what the mesh looked like after that line was run. This allowed us to directly see what gets changed and what points to where after each and every line, minimizing annoying bugs.
+</b>
+<br>
+<div align="middle">
+  <img src="triangles.png" align="middle" width="50%">
+</div>
+
+<p>
+    Here are two images of the teapot. The left teapot is before any edge flips were introduced and the right teapot is after edge flips were added. 
+</p>
+<div align="middle">
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="part4_preflip.png" align="middle" width="500px"/>
+        <figcaption>Original Teapot Before Edge Flips</figcaption>
+      </td>
+      <td>
+        <img src="part4_afterflip.png" align="middle" width="500px"/>
+        <figcaption>Teapot After Edge Flips</figcaption>
+      </td>
+    </tr>
+    <br>
+    <br>
+  </table>
+</div>
+<br>
+
+
+<h3 align="middle">Part 5: Edge Split</h3>
+<b>
+  Briefly explain how you implemented the edge split operation and describe any interesting implementation / debugging tricks you have used.
+</b>
+<p>
+  This part dealt with edge-splits, an operation that’s relatively similar to edge-flips, but as shown in the diagram below, instead of edge (b, c) getting deleted and edge (a, d) getting added, we instead add edge (a, d), and introduce another vertex m that lies on the intersection of edges (a, d) and (b, c). The implementation was rather similar to part 4, in that we first needed to define all the proper half edges that result from this operation, but instead of just 10 half-edges, we instead needed to define 16 half-edges (since there are 8 total edges that result after the edge is split). From these 16 half edges, we can then set each one to its proper neighbors. It’s worth noting that two NEW faces are also created from this edge split, so we had to implement two new faces in the code, too. Also, the new vertex “m” had to be defined, and this was done by defining the position of m to be in between vertices b and c. <br><br>
+
+  Debugging for this part was unfortunately much worse than part 4. We were a bit overzealous after finishing part 4 with not that many bugs, so we decided to rush into the code for part 5 without drawing out all the steps beforehand. This resulted in a very strange glitch when we finished our code, where when we tried to split an edge, it actually affected some completely random edges that were adjacent to the edge we were trying to flip in the first place. After countless hours of debugging and going through every step, we noticed that we had an extra “->next” in one of the half-edge’s definitions, and this created a huge domino effect for the other half-edges. <br><br>
+  
+  This mistake taught us an important lesson to ALWAYS reason out our implementation before going to coding, as writing it all out before - which could’ve taken at most half an hour - would’ve saved us hours upon hours of stressful debugging. <br><br> 
+</p>
+
+<div align="middle">
+  <img src="part5_triangles.png" align="middle" width="50%">
+</div>
+
+<p>
+  Below are images of dae/bean.dae before and after edge splits were added.
+</p>
+<div align="middle">
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="part5_og.png" align="middle" width="500px"/>
+        <figcaption>Original Bean Before Edge Splits</figcaption>
+      </td>
+      <td>
+        <img src="part5_aftersplit.png" align="middle" width="500px"/>
+        <figcaption>Bean After Edge Splits</figcaption>
+      </td>
+    </tr>
+    <br>
+    <br>
+  </table>
+</div>
+<br>
+
+<p>
+    Here are images of dae/cow.dae before and after both edge flips and splits. 
+</p>
+<div align="middle">
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="part5_og2.png" align="middle" width="500px"/>
+        <figcaption>Original Cow Before Edge Flips and Splits</figcaption>
+      </td>
+      <td>
+        <img src="part5_edit.png" align="middle" width="500px"/>
+        <figcaption>Cow After Edge Flips and Splits</figcaption>
+      </td>
+    </tr>
+    <br>
+    <br>
+  </table>
+</div>
+
+<br>
+
+
+<h3 align="middle">Part 6: Loop Subdivision for Mesh Upsampling</h3>
+<br>
+
+
+<p>
+  One way in which we can “upsample” our meshes is by performing loop subdivision. This process will essentially split all of our triangles into smaller triangles, effectively giving us a smoother, less-pointy mesh. However, the very first thing we had to do was loop through every single vertex in our mesh, so that we know where all of them are before we get into the rather complex computations of splitting and flipping the mesh’s edges. <br><br>
+
+  This part actually relies heavily on parts 4 and 5, because in order to perform loop subdivision, we have to essentially split every triangle into 4 smaller triangles. This is done by first splitting EVERY single edge in our mesh, and once everything has been split, we flip all the edges that connect an old vertex to a new vertex (as this will help uniformly split our triangle into 4 EQUAL triangles). Furthermore, we had to deal with all the new vertices that were being made, so using the equation given to us the spec, ​​3/8 * (A + B) + 1/8 * (C + D), we were able to quickly compute the positions of these new vertices. Furthermore, many of the old vertices also needed their positions to be updated, and so we used the other position equation given to us in the spec for these vertices, (1 - n * u) * original_position + u * original_neighbor_position_sum. <br><br>
+  
+  One huge problem we had was with getting many infinite loops in our code, resulting from the new edges we are adding into this mesh and then iterating through these new edges (so making new edges, iterating through them, making more new edges, iterating through those, infinity…). This bug was due to not setting new edges as “new”, as well as not setting old edges as “old”; this caused us to treat all the edges as the same, new and old, and therefore we couldn’t differentiate which edges we needed to iterate across. However, even after we labeled these edges, we unfortunately didn’t label them correctly, so some of the old edges were labeled as old, and vice-versa. This resulted in incredibly spiky and murky meshes, essentially the opposite of what we were going for. <br><br>
+  
+</p>
+<br>
+
+
+<p>
+    Below are images of dae/cube.dae as it goes through severl iterations of loop subdivison on the cube. After each loop subdivision, the edges become a lot smoother. After 6 levels of subdivisions, this results in the original square transforming into an asymmetrical looking sphere. You can reduce this effect by pre-splitting some edges as this results in more subdivisions which leads to the object becoming smoother quicker. 
+</p>
+<div align="middle">
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="part6_0.png" align="middle" width="500px"/>
+        <figcaption>Level 0</figcaption>
+      </td>
+      <td>
+        <img src="part6_1.png" align="middle" width="500px"/>
+        <figcaption>Level 1</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr align="center">
+      <td>
+        <img src="part6_2.png" align="middle" width="500px"/>
+        <figcaption>Level 2</figcaption>
+      </td>
+      <td>
+        <img src="part6_3.png" align="middle" width="500px"/>
+        <figcaption>Level 3</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr align="center">
+      <td>
+        <img src="part6_4.png" align="middle" width="500px"/>
+        <figcaption>Level 4</figcaption>
+      </td>
+      <td>
+        <img src="part6_5.png" align="middle" width="500px"/>
+        <figcaption>Level 5</figcaption>
+      </td>
+    </tr>
+    <tr align="center">
+      <td>
+        <img src="part6_6.png" align="middle" width="500px"/>
+        <figcaption>Level 6</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+<br>
+
+<p> Below are images of dae/cube.dae during loop subdivison where it's edge as been preprocessed. Because the edge flips and splits added divided each face of the cube symmetrically, during the loop divison, the cube was able to become a more symmetrical sphere faster. Instead of 6 levels of loop subdivisons, it only took 5. </p>
+
+<div align="middle">
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="660.png" align="middle" width="500px"/>
+        <figcaption>Level 0</figcaption>
+      </td>
+      <td>
+        <img src="661.png" align="middle" width="500px"/>
+        <figcaption>Level 1</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr align="center">
+      <td>
+        <img src="662.png" align="middle" width="500px"/>
+        <figcaption>Level 2</figcaption>
+      </td>
+      <td>
+        <img src="663.png" align="middle" width="500px"/>
+        <figcaption>Level 3</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr align="center">
+      <td>
+        <img src="664.png" align="middle" width="500px"/>
+        <figcaption>Level 4</figcaption>
+      </td>
+      <td>
+        <img src="665.png" align="middle" width="500px"/>
+        <figcaption>Level 5</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+</body>
 </html>
